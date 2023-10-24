@@ -63,14 +63,13 @@ class CharacterSegmentation:
 
     def calc_baselines(self):
         dark_pixel_count = list()
-        pixel_count = 0
         for i in range(self.h - self.scan_width):
             pixel_count = 0
             for j in range(self.w):
                 pixel_count += np.sum([self.img[i + k, j] == 1.0 for k in range(self.scan_width)])
             dark_pixel_count.append(pixel_count)
 
-        beta = 0.5
+        beta = 0.95
         new_dark_pixel_count = dark_pixel_count.copy()
         for i in range(len(dark_pixel_count)):
             if i == 0:
@@ -109,7 +108,6 @@ class CharacterSegmentation:
         plt.plot(new_dark_pixel_count, c='black')
         plt.show()
 
-        lower_baseline = None
         for i in range(len(new_dark_pixel_count) - 1, 19, -1):
             first_point = i
             mid_point = i - 10
@@ -118,83 +116,16 @@ class CharacterSegmentation:
                 if new_dark_pixel_count[last_point] - new_dark_pixel_count[mid_point] >= 2 * self.stroke_width:
                     candidates.append(mid_point)
         if len(candidates) == 0:
-            lower_baseline = self.h
+            lower_baseline = self.h - 1
         else:
             lower_baseline = candidates[-1]
         return upper_baseline, lower_baseline
 
-    def find_cappoints(self):
-        cpoints = []
-        dpoints = []
-        for i in range(self.w):
-            col = self.img[:, i:(i+1)]
-            k = col.shape[0]
-            while k > 0:
-                if col[k-1] == 1.0:
-                    dpoints.append((i, k))
-                    break
-                k -= 1
-            for j in range(col.shape[0]):
-                if col[j] == 1.0:
-                    cpoints.append((i, j))
-                    break
-        return cpoints, dpoints
-
-    def base_lines(self, upoints, dpoints):
-        colu = []
-        for i in range(len(upoints)):
-            colu.append(upoints[i][1])
-
-        maxyu = max(colu)
-        minyu = min(colu)
-        avgu = (maxyu + minyu) // 2
-        meanu = np.around(np.mean(colu)).astype(int)
-
-        cold = []
-        for i in range(len(dpoints)):
-            cold.append(dpoints[i][1])
-
-        maxyd = max(cold)
-        minyd = min(cold)
-        avgd = (maxyu + minyd) // 2
-        meand = np.around(np.mean(cold)).astype(int)
-
-        cn = []
-        count = 0
-
-        for i in range(self.h):
-            for j in range(self.w):
-                if self.img[i, j] == 1.0:
-                    count += 1
-            if count != 0:
-                cn.append(count)
-                count = 0
-        maxindex = cn.index(max(cn))
-
-        # plt.hlines(meanu - 6, 0, self.w, colors='black', linewidth=1)
-        lb = 0
-        if maxindex > meand:
-            lb = maxindex
-            # plt.hlines(maxindex + 6, 0, self.w, colors='black', linewidth=1)
-        else:
-            lb = meand
-            # plt.hlines(meand + 6, 0, self.w, colors='black', linewidth=1)
-
-        # plt.imshow(1 - self.img, cmap='gray')
-        # plt.show()
-        return max(0, meanu - 6), min(lb + 6, self.h - 1)
-
     def calc_density(self, upper_baseline, lower_baseline):
         cropped = self.img[upper_baseline: lower_baseline, 0:self.w]
-        # plt.imshow(cropped)
-        # plt.show()
         colcnt = np.sum(cropped == 1.0, axis=0)
         pixel_max = np.max(cropped == 1.0, axis=0)
         pixel_min = np.min(cropped == 1.0, axis=0)
-        # x = list(range(len(colcnt)))
-        # plt.plot(colcnt)
-        # plt.fill_between(x, colcnt, 1, facecolor='blue', alpha=0.5)
-        # plt.show()
         return colcnt, pixel_max, pixel_min
 
     def detect_segpoints(self, upper_baseline, lower_baseline, colcnt):
@@ -204,6 +135,8 @@ class CharacterSegmentation:
 
         for i in range(len(colcnt)):
             if colcnt[i] < self.stroke_width:
+                print(colcnt[i])
+                print(self.stroke_width)
                 seg1.append(i)
         print("Candidates: ", seg1)
 
@@ -229,14 +162,15 @@ class CharacterSegmentation:
             ones1 = []
             for j in range(len(i)):
                 if i[j] == 1:
-                    ones1.append([j])
-            if len(ones) == 0:
-                ones1.extend([[1], [1]])
+                    ones1.append(j)
+            if len(ones1) == 0:
+                ones1.extend([1, 1])
             ones.append(ones1)
+        print(ones)
 
         diffarr = []
         for i in ones:
-            diff = i[len(i) - 1][0] - i[0][0]
+            diff = i[len(i) - 1] - i[0]
             diffarr.append(diff)
         print('Difference array: ', diffarr)
 
@@ -247,8 +181,8 @@ class CharacterSegmentation:
         for i in range(len(seg)):
             plt.vlines(seg[i], 0, self.h, colors='black', linewidth=1)
 
-        plt.hlines(upper_baseline, 0, self.w, colors='black', linewidth=1)
-        plt.hlines(lower_baseline, 0, self.w, colors='black', linewidth=1)
+        plt.hlines(upper_baseline, 0, self.w, colors='red', linewidth=1)
+        plt.hlines(lower_baseline, 0, self.w, colors='red', linewidth=1)
         plt.imshow(1 - self.img, cmap='gray')
         plt.show()
         return seg
@@ -257,14 +191,12 @@ class CharacterSegmentation:
         s = 0
         char_list = []
         for i in range(len(seg)):
-            char_img = None
             if i == 0:
                 s = seg[i]
                 if s > 15:
                     char_img = self.img[0:, 0:s]
                     cntx = np.count_nonzero(char_img == 1.0)
                     print('count', cntx)
-                    # char_list.append(char_img)
                 else:
                     continue
             elif i != (len(seg) - 1):
@@ -272,7 +204,6 @@ class CharacterSegmentation:
                     char_img = self.img[0:, s:seg[i]]
                     cntx = np.count_nonzero(char_img == 1.0)
                     print('count', cntx)
-                    # char_list.append(char_img)
                     s = seg[i]
                 else:
                     continue
@@ -299,7 +230,7 @@ class CharacterSegmentation:
         upper_baseline, lower_baseline = self.calc_baselines()
 
         print(self.seperation_threshold)
-        self.seperation_threshold = ((lower_baseline - upper_baseline) * 2) // 4
+        self.seperation_threshold = (lower_baseline - upper_baseline) // 3
         print(upper_baseline, lower_baseline)
         print(self.seperation_threshold)
 
