@@ -1,6 +1,6 @@
-import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+from utils import *
 
 
 class CharacterSegmentation:
@@ -70,7 +70,7 @@ class CharacterSegmentation:
             dark_pixel_count.append(pixel_count)
 
         beta = 0.95
-        gap = self.w // 10
+        gap = self.h // 10
 
         new_dark_pixel_count = dark_pixel_count.copy()
         for i in range(len(dark_pixel_count)):
@@ -82,44 +82,65 @@ class CharacterSegmentation:
         plt.show()
 
         candidates = []
-        upper_baseline = None
+        flag = True
+        min_deg = np.Inf
         for i in range(len(new_dark_pixel_count) - gap * 2):
-            first_point = i
-            mid_point = i + gap
-            last_point = i + 2 * gap
-            if check_positive_change(first_point, mid_point, last_point):
-                    candidates.append(mid_point)
+            first_vector = (-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap])
+            second_vector = (gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap])
+            deg, positive = calc_angle(first_vector, second_vector)
+            if positive:
+                flag = False
+                if deg <= 90.0:
+                    candidates.append(i + gap)
+                    break
+                else:
+                    if deg < min_deg:
+                        min_deg = deg
+                        candidates.append(i + gap)
+            else:
+                if not flag:
+                    break
         if len(candidates) == 0:
             upper_baseline = 0
         else:
-            for i in range(len(candidates) - 1):
-                if candidates[i + 1] - candidates[i] > self.seperation_threshold:
-                    upper_baseline = candidates[i]
-                    break
-                elif i == len(candidates) - 2:
-                    upper_baseline = candidates[i + 1]
+            upper_baseline = candidates[-1]
         candidates.clear()
 
         new_dark_pixel_count = dark_pixel_count.copy()
-        for i in range(len(dark_pixel_count) - 1, -1, -1):
-            if i == (len(dark_pixel_count) - 1):
-                new_dark_pixel_count[i] = dark_pixel_count[i]
+        for i in range(len(dark_pixel_count)):
+            if i == 0:
+                new_dark_pixel_count[i] = dark_pixel_count[len(dark_pixel_count) - i - 1]
             else:
-                new_dark_pixel_count[i] = beta * new_dark_pixel_count[i + 1] + (1 - beta) * dark_pixel_count[i]
+                new_dark_pixel_count[i] = beta * new_dark_pixel_count[i - 1] \
+                                          + (1 - beta) * dark_pixel_count[len(dark_pixel_count) - i - 1]
         plt.plot(new_dark_pixel_count, c='black')
         plt.show()
 
-        for i in range(len(new_dark_pixel_count) - 1, 19, -1):
-            first_point = i
-            mid_point = i - 10
-            last_point = i - 20
-            if new_dark_pixel_count[mid_point] - new_dark_pixel_count[first_point] <= self.stroke_width:
-                if new_dark_pixel_count[last_point] - new_dark_pixel_count[mid_point] >= 2 * self.stroke_width:
-                    candidates.append(mid_point)
+        flag = True
+        min_deg = np.Inf
+        for i in range(len(new_dark_pixel_count) - 2 * gap):
+            first_vector = (-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap])
+            second_vector = (gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap])
+            deg, positive = calc_angle(first_vector, second_vector)
+            if positive:
+                flag = False
+                if deg <= 90.0:
+                    candidates.append(len(dark_pixel_count) - i - gap - 1)
+                    break
+                else:
+                    if deg < min_deg:
+                        min_deg = deg
+                        candidates.append(len(dark_pixel_count) - i - gap - 1)
+            else:
+                if not flag:
+                    break
+
         if len(candidates) == 0:
             lower_baseline = self.h - 1
         else:
             lower_baseline = candidates[-1]
+
+        print(gap)
         return upper_baseline, lower_baseline
 
     def calc_density(self, upper_baseline, lower_baseline):
@@ -136,8 +157,6 @@ class CharacterSegmentation:
 
         for i in range(len(colcnt)):
             if colcnt[i] < self.stroke_width:
-                print(colcnt[i])
-                print(self.stroke_width)
                 seg1.append(i)
         print("Candidates: ", seg1)
 
@@ -229,14 +248,12 @@ class CharacterSegmentation:
 
     def run(self):
         upper_baseline, lower_baseline = self.calc_baselines()
-
-        print(self.seperation_threshold)
-        self.seperation_threshold = (lower_baseline - upper_baseline) // 3
         print(upper_baseline, lower_baseline)
+
+        self.seperation_threshold = (lower_baseline - upper_baseline) // 3
         print(self.seperation_threshold)
 
         colcnt, pixel_max, pixel_min = self.calc_density(upper_baseline, lower_baseline)
-        print(pixel_max.shape)
 
         seg = self.detect_segpoints(upper_baseline, lower_baseline, colcnt)
 
