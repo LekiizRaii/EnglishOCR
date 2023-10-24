@@ -70,6 +70,8 @@ class CharacterSegmentation:
             dark_pixel_count.append(pixel_count)
 
         beta = 0.95
+        gap = self.w // 10
+
         new_dark_pixel_count = dark_pixel_count.copy()
         for i in range(len(dark_pixel_count)):
             if i == 0:
@@ -81,12 +83,11 @@ class CharacterSegmentation:
 
         candidates = []
         upper_baseline = None
-        for i in range(len(new_dark_pixel_count) - 20):
+        for i in range(len(new_dark_pixel_count) - gap * 2):
             first_point = i
-            mid_point = i + 10
-            last_point = i + 20
-            if new_dark_pixel_count[mid_point] - new_dark_pixel_count[first_point] <= self.stroke_width:
-                if new_dark_pixel_count[last_point] - new_dark_pixel_count[mid_point] >= 2 * self.stroke_width:
+            mid_point = i + gap
+            last_point = i + 2 * gap
+            if check_positive_change(first_point, mid_point, last_point):
                     candidates.append(mid_point)
         if len(candidates) == 0:
             upper_baseline = 0
