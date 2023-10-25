@@ -4,7 +4,7 @@ from utils import *
 
 
 class CharacterSegmentation:
-    def __init__(self, img_dir, seperation_threshold=15, round_threshold=50, scan_width=3):
+    def __init__(self, img_dir, seperation_threshold=15, round_threshold=10, scan_width=3):
         """
         Parameters:
         - img_dir (string): Directory to the image
@@ -78,25 +78,20 @@ class CharacterSegmentation:
                 new_dark_pixel_count[i] = dark_pixel_count[i]
             else:
                 new_dark_pixel_count[i] = beta * new_dark_pixel_count[i - 1] + (1 - beta) * dark_pixel_count[i]
-        plt.plot(new_dark_pixel_count, c='black')
-        plt.show()
 
         candidates = []
         flag = True
         min_deg = np.Inf
         for i in range(len(new_dark_pixel_count) - gap * 2):
-            first_vector = (-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap])
-            second_vector = (gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap])
+            first_vector = [-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap]]
+            second_vector = [gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap]]
             deg, positive = calc_angle(first_vector, second_vector)
-            if positive:
+            if positive and deg <= 160.0:
                 flag = False
-                if deg <= 90.0:
+                if deg < min_deg:
+                    min_deg = deg
                     candidates.append(i + gap)
-                    break
-                else:
-                    if deg < min_deg:
-                        min_deg = deg
-                        candidates.append(i + gap)
+                    plt.scatter(i + gap, new_dark_pixel_count[i + gap], c='red')
             else:
                 if not flag:
                     break
@@ -104,6 +99,8 @@ class CharacterSegmentation:
             upper_baseline = 0
         else:
             upper_baseline = candidates[-1]
+        plt.plot(new_dark_pixel_count, c='black')
+        plt.show()
         candidates.clear()
 
         new_dark_pixel_count = dark_pixel_count.copy()
@@ -113,34 +110,35 @@ class CharacterSegmentation:
             else:
                 new_dark_pixel_count[i] = beta * new_dark_pixel_count[i - 1] \
                                           + (1 - beta) * dark_pixel_count[len(dark_pixel_count) - i - 1]
-        plt.plot(new_dark_pixel_count, c='black')
-        plt.show()
 
         flag = True
         min_deg = np.Inf
+
+        deg_list = []
+
         for i in range(len(new_dark_pixel_count) - 2 * gap):
-            first_vector = (-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap])
-            second_vector = (gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap])
+            first_vector = [-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap]]
+            second_vector = [gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap]]
             deg, positive = calc_angle(first_vector, second_vector)
-            if positive:
+            deg_list.append(deg)
+            if positive and deg <= 160.0:
                 flag = False
-                if deg <= 90.0:
+                if deg < min_deg:
+                    min_deg = deg
                     candidates.append(len(dark_pixel_count) - i - gap - 1)
-                    break
-                else:
-                    if deg < min_deg:
-                        min_deg = deg
-                        candidates.append(len(dark_pixel_count) - i - gap - 1)
+                    plt.scatter(i + gap, new_dark_pixel_count[i + gap], c='red')
             else:
                 if not flag:
                     break
-
         if len(candidates) == 0:
             lower_baseline = self.h - 1
         else:
             lower_baseline = candidates[-1]
+        plt.plot(new_dark_pixel_count, c='black')
+        plt.show()
 
-        print(gap)
+        print('Deg list: ', deg_list)
+
         return upper_baseline, lower_baseline
 
     def calc_density(self, upper_baseline, lower_baseline):
@@ -186,7 +184,7 @@ class CharacterSegmentation:
             if len(ones1) == 0:
                 ones1.extend([1, 1])
             ones.append(ones1)
-        print(ones)
+        print("Ones array: ", ones)
 
         diffarr = []
         for i in ones:
@@ -216,14 +214,14 @@ class CharacterSegmentation:
                 if s > 15:
                     char_img = self.img[0:, 0:s]
                     cntx = np.count_nonzero(char_img == 1.0)
-                    print('count', cntx)
+                    # print('count', cntx)
                 else:
                     continue
             elif i != (len(seg) - 1):
                 if seg[i] - s > 15:
                     char_img = self.img[0:, s:seg[i]]
                     cntx = np.count_nonzero(char_img == 1.0)
-                    print('count', cntx)
+                    # print('count', cntx)
                     s = seg[i]
                 else:
                     continue
@@ -231,19 +229,23 @@ class CharacterSegmentation:
                 if seg[i] - s > 15:
                     char_img = self.img[0:, s:seg[i]]
                     cntx = np.count_nonzero(char_img == 1.0)
-                    print('count', cntx)
+                    # print('count', cntx)
                     char_list.append(char_img)
                     s = seg[i]
                 char_img = self.img[0:, seg[len(seg) - 1]:]
                 cntx = np.count_nonzero(self.img == 1.0)
-                print('count', cntx)
+                # print('count', cntx)
 
             char_list.append(char_img)
 
-        # fig, axes = plt.subplots(1, len(char_list))
-        # for i in range(len(char_list)):
-        #     axes[i].imshow(char_list[i], cmap='gray')
-        # plt.show()
+        fig, axes = plt.subplots(1, len(char_list))
+        if len(char_list) > 0:
+            if len(char_list) == 1:
+                axes.imshow(char_list[i], cmap='gray')
+            else:
+                for i in range(len(char_list)):
+                    axes[i].imshow(char_list[i], cmap='gray')
+            plt.show()
         return char_list
 
     def run(self):
