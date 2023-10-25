@@ -86,7 +86,7 @@ class CharacterSegmentation:
             first_vector = [-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap]]
             second_vector = [gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap]]
             deg, positive = calc_angle(first_vector, second_vector)
-            if positive and deg <= 160.0:
+            if positive and deg <= 150.0:
                 flag = False
                 if deg < min_deg:
                     min_deg = deg
@@ -113,14 +113,10 @@ class CharacterSegmentation:
 
         flag = True
         min_deg = np.Inf
-
-        deg_list = []
-
         for i in range(len(new_dark_pixel_count) - 2 * gap):
             first_vector = [-gap, new_dark_pixel_count[i] - new_dark_pixel_count[i + gap]]
             second_vector = [gap, new_dark_pixel_count[i + 2 * gap] - new_dark_pixel_count[i + gap]]
             deg, positive = calc_angle(first_vector, second_vector)
-            deg_list.append(deg)
             if positive and deg <= 160.0:
                 flag = False
                 if deg < min_deg:
@@ -136,8 +132,6 @@ class CharacterSegmentation:
             lower_baseline = candidates[-1]
         plt.plot(new_dark_pixel_count, c='black')
         plt.show()
-
-        print('Deg list: ', deg_list)
 
         return upper_baseline, lower_baseline
 
@@ -156,7 +150,6 @@ class CharacterSegmentation:
         for i in range(len(colcnt)):
             if colcnt[i] < self.stroke_width:
                 seg1.append(i)
-        print("Candidates: ", seg1)
 
         for i in range(len(seg1) - 1):
             if seg1[i + 1] - seg1[i] > self.seperation_threshold:
@@ -184,13 +177,11 @@ class CharacterSegmentation:
             if len(ones1) == 0:
                 ones1.extend([1, 1])
             ones.append(ones1)
-        print("Ones array: ", ones)
 
         diffarr = []
         for i in ones:
             diff = i[len(i) - 1] - i[0]
             diffarr.append(diff)
-        print('Difference array: ', diffarr)
 
         for i in range(len(seg2)):
             if diffarr[i] < self.round_threshold:
@@ -209,24 +200,8 @@ class CharacterSegmentation:
         s = 0
         char_list = []
         for i in range(len(seg)):
-            if i == 0:
-                s = seg[i]
-                if s > 15:
-                    char_img = self.img[0:, 0:s]
-                    cntx = np.count_nonzero(char_img == 1.0)
-                    # print('count', cntx)
-                else:
-                    continue
-            elif i != (len(seg) - 1):
-                if seg[i] - s > 15:
-                    char_img = self.img[0:, s:seg[i]]
-                    cntx = np.count_nonzero(char_img == 1.0)
-                    # print('count', cntx)
-                    s = seg[i]
-                else:
-                    continue
-            else:
-                if seg[i] - s > 15:
+            if i == len(seg) - 1:
+                if seg[i] - s >= self.seperation_threshold:
                     char_img = self.img[0:, s:seg[i]]
                     cntx = np.count_nonzero(char_img == 1.0)
                     # print('count', cntx)
@@ -235,6 +210,22 @@ class CharacterSegmentation:
                 char_img = self.img[0:, seg[len(seg) - 1]:]
                 cntx = np.count_nonzero(self.img == 1.0)
                 # print('count', cntx)
+            elif i != 0:
+                if seg[i] - s >= self.seperation_threshold:
+                    char_img = self.img[0:, s:seg[i]]
+                    cntx = np.count_nonzero(char_img == 1.0)
+                    # print('count', cntx)
+                    s = seg[i]
+                else:
+                    continue
+            else:
+                s = seg[i]
+                if s > self.seperation_threshold:
+                    char_img = self.img[0:, 0:s]
+                    cntx = np.count_nonzero(char_img == 1.0)
+                    # print('count', cntx)
+                else:
+                    continue
 
             char_list.append(char_img)
 
@@ -250,10 +241,8 @@ class CharacterSegmentation:
 
     def run(self):
         upper_baseline, lower_baseline = self.calc_baselines()
-        print(upper_baseline, lower_baseline)
 
-        self.seperation_threshold = (lower_baseline - upper_baseline) // 3
-        print(self.seperation_threshold)
+        self.seperation_threshold = (lower_baseline - upper_baseline) // 2
 
         colcnt, pixel_max, pixel_min = self.calc_density(upper_baseline, lower_baseline)
 
