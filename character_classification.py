@@ -7,18 +7,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 # Load the unknown image
 unknown_image = cv2.imread('testimg.png')  # Replace 'unknown_image.jpg' with the path to your image
-
+unknown_image = cv2.cvtColor(unknown_image, cv2.COLOR_BGR2GRAY)
 # Resize the image to (40,40)
-unknown_image_resized = cv2.resize(unknown_image, (40,40))
+unknown_image = cv2.resize(unknown_image, (40,40))
 
 # Normalize pixel values to the range [0, 1]
-unknown_image_normalized = unknown_image_resized / 255.0
-
-# Ensure the image has 3 color channels (if it's grayscale, convert it to RGB)
-if unknown_image_normalized.shape[-1] != 3:
-    unknown_image_normalized = cv2.cvtColor(unknown_image_normalized, cv2.COLOR_GRAY2RGB)
+unknown_image = unknown_image/ 255.0
+print(unknown_image.shape)
+plt.imshow(unknown_image)
 # Make predictions
-predictions = model.predict(np.expand_dims(unknown_image_normalized, axis=0))
+predictions = model.predict(np.expand_dims(unknown_image, axis=0))
 # Interpret the predictions
 predicted_class_index = np.argmax(predictions)
 factlabel=['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
