@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from numpy import asarray
 import os
 
-class CharacterSegmentation2:
+class CharacterSegmentation:
     def __init__(self, path, resultPath):
         self.path = path
         self.img = cv2.imread(path)
